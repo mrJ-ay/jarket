@@ -97,6 +97,11 @@ function addToCart(productId, count = 1) {
   const prod = products.find(p => p.id === productId);
   if (!prod) return;
 
+  if (prod.isSoldOut) {
+    alert('해당 상품은 현재 일시 품절 상태입니다.');
+    return;
+  }
+
   if (prod.sellerId && user && prod.sellerId === user.id) {
     alert('본인이 등록한 판매 물품은 장바구니에 담을 수 없습니다.');
     return;
@@ -255,8 +260,12 @@ function renderProducts() {
           <div class="current-price">${won(p.price)}</div>
         </div>
         <div class="card-actions">
-          <button class="btn-card btn-add-cart" onclick="addToCart('${p.id}')">🛒 담기</button>
-          <button class="btn-card btn-buy-now" onclick="buyNow('${p.id}')">즉시 구매</button>
+          ${p.isSoldOut ? `
+            <button class="btn-card btn-add-cart" disabled style="background:#4B5563; color:#9CA3AF; cursor:not-allowed; width:100%;">🚨 일시 품절</button>
+          ` : `
+            <button class="btn-card btn-add-cart" onclick="addToCart('${p.id}')">🛒 담기</button>
+            <button class="btn-card btn-buy-now" onclick="buyNow('${p.id}')">즉시 구매</button>
+          `}
         </div>
       </div>
     </article>
@@ -792,6 +801,9 @@ function setupEvents() {
     }
     if (CFG && CFG.oneidUrl && $('oneidFooterLink')) {
       $('oneidFooterLink').href = CFG.oneidUrl;
+    }
+    if (CFG && CFG.announcement && $('announcementText')) {
+      $('announcementText').textContent = CFG.announcement;
     }
   } catch (err) {
     console.error('Server connect error:', err);

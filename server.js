@@ -12,14 +12,19 @@ import express from 'express';
 import {
   initSchema, isDbAvailable, getPlayer, processCheckout,
   getUserInventory, getUserOrders, getReceipt,
-  createMarketItem, getActiveMarketItems, getSellerMarketItems, cancelMarketItem
+  createMarketItem, getActiveMarketItems, getSellerMarketItems, cancelMarketItem,
+  getAdminStats, getAdminOrders, refundOrderAdmin,
+  getAdminMarketItems, deleteMarketItemAdmin, getAdminPlayers, giftPlayerChips
 } from './lib/db.js';
-import { requireAuth, ONEID_URL, CLIENT_ID } from './lib/auth.js';
+import { requireAuth, requireAdmin, checkAdminAuth, ADMIN_PIN, ONEID_URL, CLIENT_ID } from './lib/auth.js';
 import { CATEGORIES, PRODUCTS } from './lib/products.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 5505);
 const SLOTS_URL = (process.env.SLOTS_URL || 'http://localhost:5504').replace(/\/$/, '');
+
+let liveAnnouncement = '📢 [자켓마트 본점] 멸종 매머드 티본 스테이크 3만 년 숙성 완료! 슬롯 잭팟 터진 고객님 우대 매장!';
+const soldOutProducts = new Set();
 
 await initSchema();
 
@@ -28,12 +33,16 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 관리자 콘솔 페이지 라우트
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
 // ---------- 공개 설정 ----------
 app.get('/api/health', (req, res) => res.json({ ok: true, db: isDbAvailable() }));
 
 app.get('/api/config', (req, res) => res.json({
   storeName: 'JARKET 자켓마트 본점',
   slogan: 'Everyday Low Profit, JARKET',
+  announcement: liveAnnouncement,
   oneidUrl: (process.env.ONEID_PUBLIC_URL || ONEID_URL).replace(/\/$/, ''),
   clientId: CLIENT_ID,
   slotsUrl: SLOTS_URL,
@@ -67,7 +76,13 @@ app.get('/api/products', async (req, res) => {
       isUserItem: true,
     }));
 
-    let allItems = [...userProducts, ...PRODUCTS];
+    const systemProducts = PRODUCTS.map(p => ({
+      ...p,
+      isSoldOut: soldOutProducts.has(p.id),
+      badge: soldOutProducts.has(p.id) ? '일시품절' : p.badge
+    }));
+
+    let allItems = [...userProducts, ...systemProducts];
 
     if (cat && cat !== 'all') {
       if (cat === 'user') {
@@ -283,6 +298,119 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
     console.error('[Checkout Error]', err);
     res.status(400).json({ error: err.message || '결제 중 오류가 발생했습니다.' });
   }
+});
+
+// ---------- 관리자 (점장실) API ----------
+app.post('/api/admin/login', (req, res) => {
+  const pin = req.body?.pin;
+  if (pin && String(pin).trim() === ADMIN_PIN) {
+    return res.json({ ok: true, user: { name: '총괄점장', role: 'admin' }, pin: ADMIN_PIN });
+  }
+  return res.status(401).json({ error: '점장 마스터 PIN이 일치하지 않습니다.' });
+});
+
+app.get('/api/admin/check', requireAdmin, (req, res) => {
+  res.json({ ok: true, user: req.user });
+});
+
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+  try {
+    const stats = await getAdminStats();
+    res.json({ ok: true, stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/orders', requireAdmin, async (req, res) => {
+  try {
+    const { search, status, limit, offset } = req.query;
+    const result = await getAdminOrders({ search, status, limit, offset });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/orders/:receiptNo/refund', requireAdmin, async (req, res) => {
+  try {
+    const { receiptNo } = req.params;
+    const reason = req.body?.reason || '점장 직권 주문 취소 환불';
+    const result = await refundOrderAdmin(receiptNo, reason);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/market/items', requireAdmin, async (req, res) => {
+  try {
+    const items = await getAdminMarketItems();
+    res.json({ ok: true, items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/market/items/:id', requireAdmin, async (req, res) => {
+  try {
+    const item = await deleteMarketItemAdmin(req.params.id);
+    res.json({ ok: true, item });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/players', requireAdmin, async (req, res) => {
+  try {
+    const players = await getAdminPlayers();
+    res.json({ ok: true, players });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/players/:id/gift', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body;
+    const result = await giftPlayerChips(id, amount, reason);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/products', requireAdmin, (req, res) => {
+  const prods = PRODUCTS.map(p => ({
+    ...p,
+    isSoldOut: soldOutProducts.has(p.id)
+  }));
+  res.json({ ok: true, products: prods });
+});
+
+app.post('/api/admin/products/:id/toggle-soldout', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const prod = PRODUCTS.find(p => p.id === id);
+  if (!prod) return res.status(404).json({ error: '해당 공식 상품을 찾을 수 없습니다.' });
+
+  if (soldOutProducts.has(id)) {
+    soldOutProducts.delete(id);
+  } else {
+    soldOutProducts.add(id);
+  }
+  res.json({ ok: true, id, isSoldOut: soldOutProducts.has(id) });
+});
+
+app.get('/api/admin/announcement', (req, res) => {
+  res.json({ ok: true, text: liveAnnouncement });
+});
+
+app.post('/api/admin/announcement', requireAdmin, (req, res) => {
+  const text = req.body?.text;
+  if (!text || !text.trim()) return res.status(400).json({ error: '공지 문구를 입력해주세요.' });
+  liveAnnouncement = text.trim();
+  res.json({ ok: true, text: liveAnnouncement });
 });
 
 // ---------- 404 및 에러 처리 ----------

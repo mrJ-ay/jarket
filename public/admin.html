@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARKET 관리자 콘솔 — 점장실 백오피스</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- 1. 점장 마스터 PIN 잠금 화면 (비인가 접근 차단) -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-card">
+      <div class="lock-icon">🔐</div>
+      <div class="lock-badge">JARKET HQ BACKOFFICE</div>
+      <h2>자켓마트 점장실 인증</h2>
+      <p class="lock-desc">점장 마스터 PIN 또는 ONEID 관리자 권한이 필요합니다.</p>
+
+      <form id="pinForm" class="lock-form">
+        <div class="pin-input-group">
+          <input type="password" id="pinInput" placeholder="점장 마스터 PIN (기본: 7777)" maxlength="16" autofocus autocomplete="current-password">
+          <button type="submit" class="btn-unlock" id="unlockBtn">입장 ↵</button>
+        </div>
+        <p class="pin-hint">💡 점장 마스터 PIN 기본값: <b>7777</b> (또는 ONEID Jae 관리자 로그인)</p>
+        <div class="lock-error" id="lockError"></div>
+      </form>
+
+      <div class="lock-alt">
+        <button type="button" class="btn-alt-oneid" id="oneidAdminBtn">🔑 ONEID 관리자 로그인으로 인증</button>
+        <a href="/" class="btn-back-mall">🛒 자켓마트 매장으로 돌아가기</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 관리자 메인 콘솔 (인증 완료 시 노출) -->
+  <div class="admin-wrapper" id="adminWrapper" style="display: none;">
+    <!-- 상단 헤더 -->
+    <header class="admin-header">
+      <div class="header-left">
+        <a href="/" class="admin-brand">
+          <span class="brand-j">J</span>
+          <span class="brand-title">JARKET</span>
+          <span class="brand-sub">점장실 백오피스</span>
+        </a>
+        <span class="live-pill"><span class="dot"></span> 영업 중</span>
+        <span class="db-pill" id="dbStatusPill">DB 실시간 연동</span>
+      </div>
+
+      <div class="header-right">
+        <div class="admin-profile">
+          <span class="role-badge">HQ 점장</span>
+          <b id="adminNameDisplay">총괄점장</b>
+        </div>
+        <a href="/" target="_blank" class="head-btn head-btn-mall">🛒 매장 보기</a>
+        <a href="https://vegas-slots-2izy.onrender.com" target="_blank" class="head-btn head-btn-slot">🎰 NEON STRIP</a>
+        <button id="adminLogoutBtn" class="head-btn head-btn-logout">🚪 로그아웃</button>
+      </div>
+    </header>
+
+    <!-- 탭 내비게이션 -->
+    <nav class="admin-nav">
+      <div class="nav-container">
+        <button class="nav-tab active" data-tab="dashboard">
+          <span class="icon">📊</span>
+          <span>영업 현황 요약</span>
+        </button>
+        <button class="nav-tab" data-tab="orders">
+          <span class="icon">🧾</span>
+          <span>전체 주문 / 환불 관리</span>
+          <span class="nav-count" id="tabOrdersCount">0</span>
+        </button>
+        <button class="nav-tab" data-tab="market">
+          <span class="icon">🥕</span>
+          <span>유저 직거래 마켓</span>
+          <span class="nav-count" id="tabMarketCount">0</span>
+        </button>
+        <button class="nav-tab" data-tab="operations">
+          <span class="icon">🏷️</span>
+          <span>상품 / 전광판 운영</span>
+        </button>
+        <button class="nav-tab" data-tab="players">
+          <span class="icon">👥</span>
+          <span>카지노 고객 잔고 관리</span>
+        </button>
+      </div>
+      <button class="btn-refresh-all" id="refreshAllBtn" title="실시간 데이터 새로고침">🔄 새로고침</button>
+    </nav>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="admin-content">
+
+      <!-- ================= 탭 1: 영업 현황 요약 ================= -->
+      <section class="tab-pane active" id="pane-dashboard">
+        <!-- 요약 스탯 카드 그리드 -->
+        <div class="stats-grid">
+          <div class="stat-box primary">
+            <div class="stat-top">
+              <span class="stat-title">총 누적 매출액 (카지노 칩)</span>
+              <span class="stat-icon">💰</span>
+            </div>
+            <div class="stat-val" id="statRevenue">$0</div>
+            <div class="stat-foot">환불 건을 제외한 실 결제 누적액</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="stat-top">
+              <span class="stat-title">총 결제 주문 건수</span>
+              <span class="stat-icon">🧾</span>
+            </div>
+            <div class="stat-val" id="statOrders">0건</div>
+            <div class="stat-foot">평균 객단가: <b id="statAvgOrder">$0</b></div>
+          </div>
+
+          <div class="stat-box">
+            <div class="stat-top">
+              <span class="stat-title">결제 고객 수</span>
+              <span class="stat-icon">👥</span>
+            </div>
+            <div class="stat-val" id="statBuyers">0명</div>
+            <div class="stat-foot">전체 카지노 회원: <span id="statTotalPlayers">0</span>명</div>
+          </div>
+
+          <div class="stat-box highlight">
+            <div class="stat-top">
+              <span class="stat-title">유저 당근 마켓 매물</span>
+              <span class="stat-icon">🥕</span>
+            </div>
+            <div class="stat-val" id="statMarketItems">0개</div>
+            <div class="stat-foot">현재 판매중: <b id="statActiveMarket">0</b>개 / 누적 판매: <span id="statMarketSales">0</span>건</div>
+          </div>
+        </div>
+
+        <!-- 퀵 컨트롤 & 최근 실시간 주문 리스트 -->
+        <div class="dash-split">
+          <!-- 왼쪽: 긴급 전광판 방송 컨트롤 -->
+          <div class="dash-card">
+            <div class="card-head">
+              <h3>📢 마트 상단 전광판 실시간 방송</h3>
+              <span class="sub">수정 즉시 모든 쇼핑몰 고객 화면에 전광판 문구가 업데이트됩니다.</span>
+            </div>
+            <div class="announcement-edit-box">
+              <textarea id="quickAnnouncementInput" rows="3" placeholder="예: 📢 [자켓마트 본점] 오늘 하루 전단특가 전품목 긴급 세일!"></textarea>
+              <div class="edit-actions">
+                <button class="btn-action primary" id="saveAnnouncementBtn">🚀 전광판 송출</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 오른쪽: 최근 5건 결제 현황 -->
+          <div class="dash-card">
+            <div class="card-head">
+              <h3>⚡ 최근 결제 영수증 피드</h3>
+              <button class="btn-link" id="gotoOrdersTabBtn">전체 보기 →</button>
+            </div>
+            <div class="recent-orders-list" id="recentOrdersList">
+              <p class="empty-hint">주문 내역을 불러오는 중입니다...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 탭 2: 전체 주문 / 환불 관리 ================= -->
+      <section class="tab-pane" id="pane-orders">
+        <div class="dash-card">
+          <div class="card-head between">
+            <div>
+              <h3>🧾 전체 주문 영수증 및 환불 관리</h3>
+              <p class="sub">구매 고객들의 영수증 원본을 확인하고, 필요 시 원클릭으로 카지노 칩 전액 환불을 집행할 수 있습니다.</p>
+            </div>
+            <div class="filter-group">
+              <select id="orderStatusFilter" class="admin-select">
+                <option value="all">전체 상태</option>
+                <option value="completed">결제 완료</option>
+                <option value="refunded">환불 완료</option>
+              </select>
+              <input type="text" id="orderSearchInput" class="admin-input" placeholder="영수증 번호, 고객명 검색...">
+              <button class="btn-action" id="searchOrdersBtn">🔍 검색</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table" id="ordersTable">
+              <thead>
+                <tr>
+                  <th>영수증 번호</th>
+                  <th>구매 고객</th>
+                  <th>구매 상품 요약</th>
+                  <th>수량</th>
+                  <th>결제 금액</th>
+                  <th>결제 일시</th>
+                  <th>상태</th>
+                  <th>관리 작업</th>
+                </tr>
+              </thead>
+              <tbody id="ordersTableBody">
+                <tr><td colspan="8" class="empty-cell">주문 내역을 불러오는 중입니다...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 탭 3: 유저 직거래 마켓 관리 ================= -->
+      <section class="tab-pane" id="pane-market">
+        <div class="dash-card">
+          <div class="card-head between">
+            <div>
+              <h3>🥕 유저 직접 판매 매물 검수 & 관리</h3>
+              <p class="sub">유저들이 등록한 판매 매물을 모니터링하고 폭리, 허위, 부적절한 매물을 즉시 강제 철거/삭제합니다.</p>
+            </div>
+            <button class="btn-action" id="refreshMarketBtn">🔄 매물 목록 새로고침</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table" id="marketTable">
+              <thead>
+                <tr>
+                  <th>매물 ID</th>
+                  <th>아이콘</th>
+                  <th>상품명</th>
+                  <th>판매자 (카지노 ID)</th>
+                  <th>판매 가격</th>
+                  <th>잔여 재고</th>
+                  <th>누적 판매</th>
+                  <th>상태</th>
+                  <th>등록 일시</th>
+                  <th>작업</th>
+                </tr>
+              </thead>
+              <tbody id="marketTableBody">
+                <tr><td colspan="10" class="empty-cell">유저 매물 목록을 불러오는 중입니다...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 탭 4: 상품 / 전광판 운영 ================= -->
+      <section class="tab-pane" id="pane-operations">
+        <div class="dash-card">
+          <div class="card-head">
+            <h3>🏷️ 자켓마트 18대 공식 기획 상품 및 재고 스위치</h3>
+            <p class="sub">공식 상품의 품절(Sold Out) 여부를 실시간으로 토글하여 쇼핑몰 매대에 즉각 반영합니다.</p>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table" id="productsTable">
+              <thead>
+                <tr>
+                  <th>상품 ID</th>
+                  <th>아이콘</th>
+                  <th>상품명</th>
+                  <th>카테고리</th>
+                  <th>판매 가격</th>
+                  <th>단위 / 포장</th>
+                  <th>상품 뱃지</th>
+                  <th>재고 상태</th>
+                  <th>스위치</th>
+                </tr>
+              </thead>
+              <tbody id="productsTableBody">
+                <tr><td colspan="9" class="empty-cell">공식 상품 목록을 불러오는 중입니다...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 탭 5: 카지노 고객 잔고 관리 ================= -->
+      <section class="tab-pane" id="pane-players">
+        <div class="dash-card">
+          <div class="card-head between">
+            <div>
+              <h3>👥 카지노 연동 고객 및 칩 현황</h3>
+              <p class="sub">NEON STRIP 카지노 플레이어의 현재 칩 잔고를 확인하고, 이벤트 보너스 지원금을 직접 지급할 수 있습니다.</p>
+            </div>
+            <button class="btn-action" id="refreshPlayersBtn">🔄 고객 목록 새로고침</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table" id="playersTable">
+              <thead>
+                <tr>
+                  <th>고객 ID (UUID)</th>
+                  <th>닉네임</th>
+                  <th>현재 카지노 칩 잔고</th>
+                  <th>최근 활동 일시</th>
+                  <th>점장 특권 작업</th>
+                </tr>
+              </thead>
+              <tbody id="playersTableBody">
+                <tr><td colspan="5" class="empty-cell">고객 목록을 불러오는 중입니다...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- 3. 영수증 원본 모달 -->
+  <div class="modal-backdrop" id="receiptModal" style="display: none;">
+    <div class="receipt-card">
+      <div class="receipt-header">
+        <h3>🧾 영수증 상세 원본</h3>
+        <button class="modal-close-btn" id="closeReceiptModalBtn">✕</button>
+      </div>
+      <div class="receipt-body" id="receiptModalBody">
+        <!-- 동적 렌더링 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 보너스 칩 지급 모달 -->
+  <div class="modal-backdrop" id="giftModal" style="display: none;">
+    <div class="gift-card">
+      <div class="gift-header">
+        <h3>🎁 점장 특권 보너스 칩 지급</h3>
+        <button class="modal-close-btn" id="closeGiftModalBtn">✕</button>
+      </div>
+      <form id="giftForm" class="gift-form">
+        <div class="form-row">
+          <label>지급 대상 고객</label>
+          <input type="text" id="giftTargetName" readonly class="readonly-input">
+          <input type="hidden" id="giftTargetId">
+        </div>
+        <div class="form-row">
+          <label>지급할 카지노 칩 금액 ($)</label>
+          <input type="number" id="giftAmountInput" min="1" step="1" placeholder="예: 100" required>
+        </div>
+        <div class="form-row">
+          <label>지급 사유 / 메모</label>
+          <input type="text" id="giftReasonInput" placeholder="예: 자켓마트 단골 우대 쇼핑 지원금" required>
+        </div>
+        <div class="gift-actions">
+          <button type="button" class="btn-cancel" id="cancelGiftBtn">취소</button>
+          <button type="submit" class="btn-confirm-gift">🎰 즉시 카지노 칩 지급</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 컨테이너 -->
+  <div class="toast-wrap" id="adminToastWrap"></div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
