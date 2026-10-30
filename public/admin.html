@@ -12,26 +12,17 @@
 </head>
 <body>
 
-  <!-- 1. 점장 마스터 PIN 잠금 화면 (비인가 접근 차단) -->
-  <div class="lock-screen" id="lockScreen">
+  <!-- 1. ONEID 관리자 인증 게이트 (비로그인 또는 비인가 유저일 때만 노출) -->
+  <div class="lock-screen" id="lockScreen" style="display: none;">
     <div class="lock-card">
-      <div class="lock-icon">🔐</div>
+      <div class="lock-icon" id="gateIcon">🔑</div>
       <div class="lock-badge">JARKET HQ BACKOFFICE</div>
-      <h2>자켓마트 점장실 인증</h2>
-      <p class="lock-desc">점장 마스터 PIN 또는 ONEID 관리자 권한이 필요합니다.</p>
+      <h2 id="gateTitle">자켓마트 관리자 콘솔</h2>
+      <p class="lock-desc" id="gateDesc">ONEID 관리자(admin) 계정 인증이 필요합니다.</p>
 
-      <form id="pinForm" class="lock-form">
-        <div class="pin-input-group">
-          <input type="password" id="pinInput" placeholder="점장 마스터 PIN (기본: 7777)" maxlength="16" autofocus autocomplete="current-password">
-          <button type="submit" class="btn-unlock" id="unlockBtn">입장 ↵</button>
-        </div>
-        <p class="pin-hint">💡 점장 마스터 PIN 기본값: <b>7777</b> (또는 ONEID Jae 관리자 로그인)</p>
-        <div class="lock-error" id="lockError"></div>
-      </form>
-
-      <div class="lock-alt">
-        <button type="button" class="btn-alt-oneid" id="oneidAdminBtn">🔑 ONEID 관리자 로그인으로 인증</button>
-        <a href="/" class="btn-back-mall">🛒 자켓마트 매장으로 돌아가기</a>
+      <div class="lock-alt" style="border:none; padding:0;">
+        <button type="button" class="btn-alt-oneid" id="oneidAdminBtn" style="background:var(--admin-yellow); color:#000; font-size:1rem; font-weight:800; padding:14px; border:none; border-radius:10px; cursor:pointer;">🔑 ONEID 관리자로 로그인</button>
+        <a href="/" class="btn-back-mall" style="margin-top:12px; display:inline-block;">🛒 자켓마트 매장으로 돌아가기</a>
       </div>
     </div>
   </div>

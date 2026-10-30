@@ -16,7 +16,7 @@ import {
   getAdminStats, getAdminOrders, refundOrderAdmin,
   getAdminMarketItems, deleteMarketItemAdmin, getAdminPlayers, giftPlayerChips
 } from './lib/db.js';
-import { requireAuth, requireAdmin, checkAdminAuth, ADMIN_PIN, ONEID_URL, CLIENT_ID } from './lib/auth.js';
+import { requireAuth, requireAdmin, ONEID_URL, CLIENT_ID } from './lib/auth.js';
 import { CATEGORIES, PRODUCTS } from './lib/products.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -301,14 +301,6 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
 });
 
 // ---------- 관리자 (점장실) API ----------
-app.post('/api/admin/login', (req, res) => {
-  const pin = req.body?.pin;
-  if (pin && String(pin).trim() === ADMIN_PIN) {
-    return res.json({ ok: true, user: { name: '총괄점장', role: 'admin' }, pin: ADMIN_PIN });
-  }
-  return res.status(401).json({ error: '점장 마스터 PIN이 일치하지 않습니다.' });
-});
-
 app.get('/api/admin/check', requireAdmin, (req, res) => {
   res.json({ ok: true, user: req.user });
 });

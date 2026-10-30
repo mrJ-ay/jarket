@@ -1,23 +1,25 @@
 /* =========================================================
    JARKET (자켓마트) — 점장실 백오피스 관리자 프론트엔드 (admin.js)
+   - ONEID SSO 기반 엄격한 관리자(admin) 인증
+   - PIN/임의 비밀번호 완전 제거, ONEID role === 'admin' 계정만 통과
    ========================================================= */
 
 // State
-let adminPin = sessionStorage.getItem('jarket_admin_pin') || '';
-let oneidToken = localStorage.getItem('oneid_token') || sessionStorage.getItem('oneid_token') || '';
+let token = localStorage.getItem('jk_auth') || localStorage.getItem('oneid_token') || '';
 let currentTab = 'dashboard';
 let statsData = null;
 let ordersList = [];
 let marketItemsList = [];
 let productsList = [];
 let playersList = [];
+let CFG = null;
 
 // DOM Elements
 const lockScreen = document.getElementById('lockScreen');
 const adminWrapper = document.getElementById('adminWrapper');
-const pinForm = document.getElementById('pinForm');
-const pinInput = document.getElementById('pinInput');
-const lockError = document.getElementById('lockError');
+const gateIcon = document.getElementById('gateIcon');
+const gateTitle = document.getElementById('gateTitle');
+const gateDesc = document.getElementById('gateDesc');
 const oneidAdminBtn = document.getElementById('oneidAdminBtn');
 const adminNameDisplay = document.getElementById('adminNameDisplay');
 const adminLogoutBtn = document.getElementById('adminLogoutBtn');
@@ -39,7 +41,12 @@ const giftReasonInput = document.getElementById('giftReasonInput');
 const closeGiftModalBtn = document.getElementById('closeGiftModalBtn');
 const cancelGiftBtn = document.getElementById('cancelGiftBtn');
 
-// Toast
+// PKCE / OAuth
+const PKCE_KEY = 'jk_admin_pkce';
+const AUTH_KEY = 'jk_auth';
+const redirectUri = () => location.origin + '/admin';
+const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
 function showToast(msg, type = 'info') {
   const wrap = document.getElementById('adminToastWrap');
   if (!wrap) return;
@@ -55,18 +62,79 @@ function showToast(msg, type = 'info') {
   }, 3500);
 }
 
-// Headers helper
 function getAuthHeaders() {
   const h = { 'Content-Type': 'application/json' };
-  if (adminPin) h['x-admin-pin'] = adminPin;
-  if (oneidToken) h['Authorization'] = `Bearer ${oneidToken}`;
+  if (token) h['Authorization'] = `Bearer ${token}`;
   return h;
 }
 
-// 1. 초기 인증 체크
+// 1. ONEID OAuth 콜백 처리
+async function handleOauthCallback() {
+  const p = new URLSearchParams(location.search);
+  const code = p.get('code');
+  if (!code) return;
+
+  const saved = JSON.parse(sessionStorage.getItem(PKCE_KEY) || 'null');
+  sessionStorage.removeItem(PKCE_KEY);
+  history.replaceState(null, '', '/admin');
+
+  if (!saved || saved.state !== p.get('state')) {
+    showGate('⚠️ 인증 오류', 'ONEID 로그인 검증에 실패했습니다. 다시 시도해주세요.', '🔑 다시 로그인');
+    return;
+  }
+
+  const res = await fetch(`${CFG.oneidUrl}/api/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: CFG.clientId,
+      redirect_uri: redirectUri(),
+      code,
+      code_verifier: saved.verifier
+    })
+  });
+
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showGate('⚠️ 로그인 실패', d.detail || '토큰 발급에 실패했습니다.', '🔑 다시 로그인');
+    return;
+  }
+
+  token = d.access_token;
+  localStorage.setItem(AUTH_KEY, token);
+}
+
+// 2. ONEID 로그인 시작
+async function startOneidLogin() {
+  if (!CFG) {
+    try {
+      CFG = await (await fetch('/api/config')).json();
+    } catch {
+      alert('설정 로드 실패');
+      return;
+    }
+  }
+
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = b64url(new Uint8Array(digest));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(18)));
+
+  sessionStorage.setItem(PKCE_KEY, JSON.stringify({ verifier, state }));
+  location.assign(`${CFG.oneidUrl}/login.html?` + new URLSearchParams({
+    client_id: CFG.clientId,
+    redirect_uri: redirectUri(),
+    code_challenge: challenge,
+    state,
+  }));
+}
+
+oneidAdminBtn?.addEventListener('click', startOneidLogin);
+
+// 3. 관리자 권한 확인 (ONEID 토큰 검증)
 async function checkAuth() {
-  if (!adminPin && !oneidToken) {
-    showLockScreen();
+  if (!token) {
+    showGate('🔑 관리자 로그인 필요', '자켓마트 점장실(백오피스)은 ONEID 관리자(admin) 계정으로만 접근할 수 있습니다.', '🔑 ONEID 관리자로 로그인');
     return;
   }
 
@@ -74,19 +142,37 @@ async function checkAuth() {
     const res = await fetch('/api/admin/check', {
       headers: getAuthHeaders()
     });
+
     if (res.ok) {
       const data = await res.json();
-      adminNameDisplay.textContent = data.user?.name || '총괄점장';
+      adminNameDisplay.textContent = `${data.user?.name || '관리자'} (${data.user?.role || 'admin'})`;
       unlockAdmin();
+    } else if (res.status === 403) {
+      showGate(
+        '⛔ 관리자 권한 없음',
+        '현재 로그인된 계정은 ONEID 관리자(admin) 권한이 없습니다. 권한이 있는 관리자 계정으로 다시 로그인해주세요.',
+        '🔄 다른 계정으로 ONEID 로그인'
+      );
     } else {
-      showLockScreen();
+      // 401: 토큰 만료 또는 잘못됨
+      localStorage.removeItem(AUTH_KEY);
+      token = '';
+      showGate('🔑 관리자 로그인 필요', '로그인이 만료되었거나 정보가 유효하지 않습니다. 다시 로그인해주세요.', '🔑 ONEID 관리자로 로그인');
     }
   } catch (err) {
-    showLockScreen();
+    showGate('⚠️ 서버 연결 실패', '마트 서버와 통신할 수 없습니다.', '다시 시도');
   }
 }
 
-function showLockScreen() {
+function showGate(title, desc, btnText) {
+  gateTitle.textContent = title;
+  gateDesc.textContent = desc;
+  if (title.includes('⛔')) {
+    gateIcon.textContent = '⛔';
+  } else {
+    gateIcon.textContent = '🔑';
+  }
+  oneidAdminBtn.textContent = btnText;
   lockScreen.style.display = 'flex';
   adminWrapper.style.display = 'none';
 }
@@ -97,56 +183,15 @@ function unlockAdmin() {
   loadCurrentTab();
 }
 
-// PIN 로그인 제출
-pinForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const pin = pinInput.value.trim();
-  if (!pin) return;
-
-  lockError.textContent = '인증 확인 중...';
-  try {
-    const res = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin })
-    });
-    const data = await res.json();
-    if (res.ok && data.ok) {
-      adminPin = pin;
-      sessionStorage.setItem('jarket_admin_pin', pin);
-      lockError.textContent = '';
-      adminNameDisplay.textContent = data.user?.name || '총괄점장';
-      unlockAdmin();
-      showToast('점장실에 로그인되었습니다.', 'success');
-    } else {
-      lockError.textContent = data.error || 'PIN 번호가 일치하지 않습니다.';
-    }
-  } catch (err) {
-    lockError.textContent = '서버 연결 실패';
-  }
-});
-
-// ONEID 로그인 버튼
-oneidAdminBtn.addEventListener('click', async () => {
-  try {
-    const confRes = await fetch('/api/config');
-    const conf = await confRes.json();
-    const returnUrl = encodeURIComponent(window.location.origin + '/admin');
-    window.location.href = `${conf.oneidUrl}/login?client_id=${conf.clientId || 'jarket'}&redirect_uri=${returnUrl}`;
-  } catch {
-    window.location.href = 'https://oneid-icvq.onrender.com';
-  }
-});
-
 // 로그아웃
 adminLogoutBtn.addEventListener('click', () => {
-  sessionStorage.removeItem('jarket_admin_pin');
-  adminPin = '';
-  showToast('점장실에서 로그아웃되었습니다.');
-  showLockScreen();
+  localStorage.removeItem(AUTH_KEY);
+  token = '';
+  showToast('관리자 계정에서 로그아웃되었습니다.');
+  showGate('🔑 관리자 로그인 필요', '자켓마트 점장실은 ONEID 관리자(admin) 계정으로만 접근할 수 있습니다.', '🔑 ONEID 관리자로 로그인');
 });
 
-// 2. 탭 전환
+// 4. 탭 전환
 navTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.dataset.tab;
@@ -169,7 +214,7 @@ refreshAllBtn.addEventListener('click', () => {
   showToast('데이터를 새로고침했습니다.');
 });
 
-// 3. 탭별 데이터 로더
+// 5. 탭별 데이터 로더
 function loadCurrentTab(force = false) {
   if (currentTab === 'dashboard') loadDashboard();
   else if (currentTab === 'orders') loadOrders();
@@ -624,4 +669,23 @@ function formatDate(isoStr) {
 }
 
 // 초기 실행
-checkAuth();
+(async function init() {
+  try {
+    CFG = await (await fetch('/api/config')).json();
+  } catch (e) {
+    console.error('Config fetch failed:', e);
+  }
+
+  // ONEID OAuth 콜백 처리 (?code=...)
+  try {
+    await handleOauthCallback();
+  } catch (e) {
+    console.warn('OAuth callback error:', e);
+  }
+
+  // 토큰 다시 읽기
+  token = localStorage.getItem(AUTH_KEY) || localStorage.getItem('oneid_token') || '';
+
+  // 관리자 권한 검증 및 자동 입장
+  await checkAuth();
+})();
