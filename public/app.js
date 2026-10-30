@@ -16,9 +16,9 @@ let currentSort = 'featured';
 let soundOn = true;
 let lastReceipt = null;
 
-// ---------- 유틸 & 화폐 포맷 ----------
+// ---------- 유틸 & 화폐 포맷 (슬롯머신 $ 칩 단위와 1:1 연동) ----------
 const $ = id => document.getElementById(id);
-const won = n => '₩' + Math.max(0, Math.round(n || 0)).toLocaleString('ko-KR');
+const won = n => '$' + Math.max(0, Math.round(n || 0)).toLocaleString('en-US');
 
 function toast(text) {
   const container = $('toastContainer');
@@ -298,6 +298,7 @@ async function loadMyState() {
     $('userNameDisplay').textContent = '로그인';
     $('invCountBadge').textContent = '0';
     if ($('myListingBadge')) $('myListingBadge').textContent = '0';
+    if ($('logoutBtn')) $('logoutBtn').style.display = 'none';
     return;
   }
 
@@ -309,9 +310,24 @@ async function loadMyState() {
     $('userNameDisplay').textContent = `${user.name}${user.isGuest ? ' (체험)' : ''}`;
     $('invCountBadge').textContent = data.inventoryCount || 0;
     if ($('myListingBadge')) $('myListingBadge').textContent = data.marketListingCount || 0;
+    if ($('logoutBtn')) $('logoutBtn').style.display = 'inline-flex';
   } catch (err) {
     console.warn('Failed to load user state:', err.message);
+    handleLogout(false);
   }
+}
+
+function handleLogout(showToast = true) {
+  localStorage.removeItem(AUTH_KEY);
+  token = null;
+  user = null;
+  balance = 0;
+  $('myBalanceDisplay').textContent = won(0);
+  $('userNameDisplay').textContent = '로그인';
+  $('invCountBadge').textContent = '0';
+  if ($('myListingBadge')) $('myListingBadge').textContent = '0';
+  if ($('logoutBtn')) $('logoutBtn').style.display = 'none';
+  if (showToast) toast('로그아웃되었습니다.');
 }
 
 // ---------- 결제 (Checkout) ----------
@@ -611,6 +627,7 @@ const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').
 
 async function startOneidLogin() {
   if (!CFG) return;
+  localStorage.removeItem(AUTH_KEY); // 기존 게스트 토큰 정리
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   const challenge = b64url(new Uint8Array(digest));
@@ -726,8 +743,9 @@ function setupEvents() {
     openInventoryModal();
   };
 
-  // 로그인 모달
+  // 로그인 및 로그아웃 버튼
   $('accountBtn').onclick = openLoginModal;
+  if ($('logoutBtn')) $('logoutBtn').onclick = () => handleLogout(true);
   $('closeLoginBtn').onclick = () => $('loginBackdrop').classList.remove('show');
   $('oneidLoginBtn').onclick = startOneidLogin;
   $('guestLoginBtn').onclick = startGuestLogin;
