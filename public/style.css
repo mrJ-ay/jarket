@@ -95,17 +95,30 @@ body {
   gap: 12px;
 }
 
-.slot-quicklink {
-  color: var(--primary-yellow);
+.top-nav-link {
+  color: #E2E8F0;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: opacity 0.2s;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
 }
-.slot-quicklink:hover {
-  text-decoration: underline;
+.top-nav-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  text-decoration: none;
+}
+.top-nav-link.slot-quicklink {
+  color: var(--primary-yellow);
+  font-weight: 700;
+}
+.top-nav-link.helpdesk-link {
+  color: #93C5FD;
 }
 
 .bgm-btn {
