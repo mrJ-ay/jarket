@@ -2,13 +2,18 @@
    JARKET (자켓마트) — Express Server
    - 포트: 5505
    - ONEID SSO 및 슬롯게임(vegas-slots / neonstrip) 자금 실시간 연동
+   - 유저 판매 물품 등록 및 판매 수익금 판매자 카지노 잔고 자동 입금
    ========================================================= */
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 
-import { initSchema, isDbAvailable, getPlayer, processCheckout, getUserInventory, getUserOrders, getReceipt } from './lib/db.js';
+import {
+  initSchema, isDbAvailable, getPlayer, processCheckout,
+  getUserInventory, getUserOrders, getReceipt,
+  createMarketItem, getActiveMarketItems, getSellerMarketItems, cancelMarketItem
+} from './lib/db.js';
 import { requireAuth, ONEID_URL, CLIENT_ID } from './lib/auth.js';
 import { CATEGORIES, PRODUCTS } from './lib/products.js';
 
@@ -35,16 +40,105 @@ app.get('/api/config', (req, res) => res.json({
   categories: CATEGORIES,
 }));
 
-// ---------- 상품 목록 ----------
-app.get('/api/products', (req, res) => {
-  const { cat } = req.query;
-  if (cat && cat !== 'all') {
-    return res.json(PRODUCTS.filter(p => p.category === cat));
+// ---------- 상품 목록 (시스템 공식 카탈로그 + 유저 직거래 마켓 통합) ----------
+app.get('/api/products', async (req, res) => {
+  try {
+    const { cat } = req.query;
+    const marketItems = await getActiveMarketItems();
+    
+    // 유저 등록 상품을 표준 포맷으로 변환
+    const userProducts = marketItems.map(m => ({
+      id: `user_${m.id}`,
+      marketItemId: m.id,
+      name: m.name,
+      category: m.category || 'user',
+      price: m.price,
+      originalPrice: Math.round(m.price * 1.25),
+      badge: m.badge || '개인셀러',
+      icon: m.icon || '📦',
+      unit: `잔여 ${m.stock}개`,
+      desc: m.desc_text || '유저가 직접 등록한 판매 물품입니다.',
+      flavor: `🧑‍🌾 판매자: ${m.seller_name} (수익금 100% 판매자 카지노 입금)`,
+      rating: 5.0,
+      reviews: m.sales_count,
+      sellerId: m.seller_id,
+      sellerName: m.seller_name,
+      stock: m.stock,
+      isUserItem: true,
+    }));
+
+    let allItems = [...userProducts, ...PRODUCTS];
+
+    if (cat && cat !== 'all') {
+      if (cat === 'user') {
+        allItems = userProducts;
+      } else {
+        allItems = allItems.filter(p => p.category === cat);
+      }
+    }
+
+    res.json(allItems);
+  } catch (err) {
+    console.error('[Products Error]', err);
+    res.json(PRODUCTS);
   }
-  res.json(PRODUCTS);
 });
 
-// ---------- 게스트 간편 시작 (ONEID 없이 로컬 테스트 가능) ----------
+// ---------- 유저 판매 물품 등록 API ----------
+app.post('/api/market/items', requireAuth, async (req, res) => {
+  try {
+    const { name, category, icon, price, stock, badge, descText } = req.body || {};
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: '상품명을 입력해주세요.' });
+    }
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 10) {
+      return res.status(400).json({ error: '가격은 10칩 이상이어야 합니다.' });
+    }
+    const numStock = Math.max(1, Math.min(999, parseInt(stock) || 1));
+
+    const item = await createMarketItem({
+      sellerId: req.user.id,
+      sellerName: req.user.name,
+      name: name.trim().slice(0, 30),
+      category: category || 'user',
+      icon: (icon || '📦').trim().slice(0, 10),
+      price: numPrice,
+      stock: numStock,
+      badge: (badge || '개인판매').trim().slice(0, 15),
+      descText: (descText || '').trim().slice(0, 200),
+    });
+
+    res.json({ ok: true, item });
+  } catch (err) {
+    console.error('[Create Market Item Error]', err);
+    res.status(400).json({ error: err.message || '물품 등록 실패' });
+  }
+});
+
+// ---------- 내 판매 등록 목록 및 정산액 조회 ----------
+app.get('/api/market/my', requireAuth, async (req, res) => {
+  try {
+    const items = await getSellerMarketItems(req.user.id);
+    const totalEarned = items.reduce((sum, it) => sum + (it.price * it.sales_count), 0);
+    res.json({ items, totalEarned });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- 내 판매 물품 판매 취소 ----------
+app.post('/api/market/items/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    const ok = await cancelMarketItem(req.user.id, req.params.id);
+    if (!ok) return res.status(404).json({ error: '물품을 찾을 수 없거나 이미 취소되었습니다.' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- 게스트 간편 시작 ----------
 app.post('/api/guest-login', async (req, res) => {
   const nickname = (req.body?.nickname || '슬롯단골손님').trim().slice(0, 15);
   const guestId = 'guest_' + Math.random().toString(36).slice(2, 10);
@@ -56,10 +150,13 @@ app.post('/api/guest-login', async (req, res) => {
 // ---------- 유저 내 정보 & 잔고 ----------
 app.get('/api/me', requireAuth, async (req, res) => {
   const p = await getPlayer(req.user.id, req.user.name);
-  const [inv, orders] = await Promise.all([
+  const [inv, orders, myMarketItems] = await Promise.all([
     getUserInventory(req.user.id),
-    getUserOrders(req.user.id)
+    getUserOrders(req.user.id),
+    getSellerMarketItems(req.user.id)
   ]);
+
+  const marketEarnings = myMarketItems.reduce((sum, it) => sum + (it.price * it.sales_count), 0);
 
   res.json({
     user: {
@@ -72,6 +169,8 @@ app.get('/api/me', requireAuth, async (req, res) => {
     balance: p.balance,
     inventoryCount: inv.reduce((sum, it) => sum + it.quantity, 0),
     orderCount: orders.length,
+    marketListingCount: myMarketItems.filter(i => i.is_active).length,
+    marketEarnings,
     dbConnected: isDbAvailable(),
   });
 });
@@ -103,12 +202,37 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
       return res.status(400).json({ error: '장바구니가 비어 있습니다.' });
     }
 
-    // 카탈로그 검증 및 금액 산출
+    // 유저 등록 상품 목록 가져오기
+    const activeMarket = await getActiveMarketItems();
+
     let totalAmount = 0;
     const validatedItems = [];
 
     for (const raw of rawItems) {
-      const prod = PRODUCTS.find(p => p.id === raw.id);
+      let prod = PRODUCTS.find(p => p.id === raw.id);
+      let isUser = false;
+      let sellerId = null;
+      let marketItemId = null;
+
+      if (!prod && String(raw.id).startsWith('user_')) {
+        const mId = Number(String(raw.id).replace('user_', ''));
+        const mItem = activeMarket.find(m => m.id === mId);
+        if (mItem) {
+          prod = {
+            id: `user_${mItem.id}`,
+            name: mItem.name,
+            category: mItem.category || 'user',
+            icon: mItem.icon,
+            unit: `1개`,
+            price: mItem.price,
+            stock: mItem.stock,
+          };
+          isUser = true;
+          sellerId = mItem.seller_id;
+          marketItemId = mItem.id;
+        }
+      }
+
       if (!prod) continue;
       const qty = Math.max(1, Math.min(999, parseInt(raw.qty) || 1));
       const lineTotal = prod.price * qty;
@@ -122,7 +246,10 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
         unit: prod.unit,
         price: prod.price,
         qty,
-        lineTotal
+        lineTotal,
+        sellerId,
+        marketItemId,
+        isUser
       });
     }
 

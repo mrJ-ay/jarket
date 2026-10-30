@@ -1,6 +1,7 @@
 /* =========================================================
    JARKET (자켓마트) — Frontend Application
    - 이마트 감성 가상 쇼핑몰 & NEON STRIP 슬롯 머니 결제 연동
+   - 유저 판매 물품 등록 & 판매 수익 카지노 잔고 즉시 입금 연동
    ========================================================= */
 
 // ---------- 상태 ----------
@@ -96,9 +97,14 @@ function addToCart(productId, count = 1) {
   const prod = products.find(p => p.id === productId);
   if (!prod) return;
 
+  if (prod.sellerId && user && prod.sellerId === user.id) {
+    alert('본인이 등록한 판매 물품은 장바구니에 담을 수 없습니다.');
+    return;
+  }
+
   const exist = cart.find(item => item.id === productId);
   if (exist) {
-    exist.qty = Math.min(999, exist.qty + count);
+    exist.qty = Math.min(prod.stock || 999, exist.qty + count);
   } else {
     cart.push({ id: prod.id, qty: count });
   }
@@ -112,7 +118,16 @@ function updateQty(productId, delta) {
   const item = cart.find(it => it.id === productId);
   if (!item) return;
 
+  const prod = products.find(p => p.id === productId);
+  const maxStock = prod?.stock || 999;
+
   item.qty += delta;
+  if (item.qty > maxStock) {
+    alert(`최대 재고(${maxStock}개)를 초과할 수 없습니다.`);
+    item.qty = maxStock;
+    return;
+  }
+
   if (item.qty <= 0) {
     cart = cart.filter(it => it.id !== productId);
     sfx.pop();
@@ -171,6 +186,7 @@ function renderCart() {
         <div class="cart-item-details">
           <div class="cart-item-title">${prod.name}</div>
           <div class="cart-item-price">${won(lineTotal)} <small style="color:#94a3b8;font-weight:normal">(${won(prod.price)} / ${prod.unit})</small></div>
+          ${prod.sellerName ? `<div style="font-size:0.7rem;color:#2563EB;">🧑‍🌾 셀러: ${prod.sellerName}</div>` : ''}
         </div>
         <div class="qty-control">
           <button class="qty-btn" onclick="updateQty('${prod.id}', -1)">−</button>
@@ -199,7 +215,7 @@ function renderProducts() {
   // 2. 검색어 필터
   const query = $('searchInput').value.trim().toLowerCase();
   if (query) {
-    list = list.filter(p => p.name.toLowerCase().includes(query) || p.desc.toLowerCase().includes(query));
+    list = list.filter(p => p.name.toLowerCase().includes(query) || (p.desc && p.desc.toLowerCase().includes(query)));
   }
 
   // 3. 정렬
@@ -208,7 +224,7 @@ function renderProducts() {
   } else if (currentSort === 'price-desc') {
     list.sort((a, b) => b.price - a.price);
   } else if (currentSort === 'reviews') {
-    list.sort((a, b) => b.reviews - a.reviews);
+    list.sort((a, b) => (b.reviews || 0) - (a.reviews || 0));
   }
 
   $('totalProductCount').textContent = `${list.length}개 상품 진열 중`;
@@ -217,7 +233,7 @@ function renderProducts() {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align:center; padding: 60px 20px; color:#64748b;">
         <h3>일치하는 상품이 없습니다.</h3>
-        <p>전단지 상품이나 다른 키워드로 검색해 보세요.</p>
+        <p>상단 '물품 판매 등록' 버튼을 눌러 첫 번째 상품을 올려보세요!</p>
       </div>
     `;
     return;
@@ -226,13 +242,14 @@ function renderProducts() {
   grid.innerHTML = list.map(p => `
     <article class="product-card">
       <div class="card-img-wrap">
-        <span class="card-badge">${p.badge}</span>
+        <span class="card-badge" style="${p.isUserItem ? 'background:#10B981;' : ''}">${p.badge}</span>
         <span class="card-icon">${p.icon}</span>
         <span class="card-unit">${p.unit}</span>
       </div>
       <div class="card-body">
         <h3 class="card-title">${p.name}</h3>
-        <p class="card-desc">${p.desc}</p>
+        ${p.sellerName ? `<div class="seller-tag">🧑‍🌾 셀러: ${p.sellerName} (수익금 카지노 입금)</div>` : ''}
+        <p class="card-desc" style="margin-top:6px;">${p.desc}</p>
         <div class="card-price-group">
           ${p.originalPrice ? `<div class="orig-price">${won(p.originalPrice)}</div>` : ''}
           <div class="current-price">${won(p.price)}</div>
@@ -280,6 +297,7 @@ async function loadMyState() {
     $('myBalanceDisplay').textContent = won(0);
     $('userNameDisplay').textContent = '로그인';
     $('invCountBadge').textContent = '0';
+    if ($('myListingBadge')) $('myListingBadge').textContent = '0';
     return;
   }
 
@@ -290,6 +308,7 @@ async function loadMyState() {
     $('myBalanceDisplay').textContent = won(balance);
     $('userNameDisplay').textContent = `${user.name}${user.isGuest ? ' (체험)' : ''}`;
     $('invCountBadge').textContent = data.inventoryCount || 0;
+    if ($('myListingBadge')) $('myListingBadge').textContent = data.marketListingCount || 0;
   } catch (err) {
     console.warn('Failed to load user state:', err.message);
   }
@@ -339,6 +358,9 @@ async function handleCheckout() {
     saveCart();
     closeCart();
 
+    // 상품 목록 다시 불러오기 (유저 매물 재고 차감 반영)
+    await reloadProducts();
+
     // 감열지 영수증 팝업 표시
     showReceiptModal(res);
     loadMyState();
@@ -359,7 +381,7 @@ function showReceiptModal(order) {
   const tbody = $('recTableBody');
   tbody.innerHTML = order.items.map(it => `
     <tr>
-      <td>${it.name}</td>
+      <td>${it.name}${it.sellerId ? ' (개인셀러)' : ''}</td>
       <td style="text-align:center;">${it.qty}</td>
       <td style="text-align:right;">${won(it.price)}</td>
       <td style="text-align:right; font-weight:bold;">${won(it.lineTotal)}</td>
@@ -382,7 +404,6 @@ function openTrackerModal() {
   const tracker = $('trackerBackdrop');
   tracker.classList.add('show');
 
-  // 단계별 애니메이션
   const s1 = $('step1'), s2 = $('step2'), s3 = $('step3');
   const statusBox = $('deliveryStatusBox');
 
@@ -449,9 +470,138 @@ async function openInventoryModal() {
 }
 
 function interactItem(name) {
-  navigator.clipboard.writeText(`[JARKET 플렉스] 나 슬롯 카지노 머니로 자켓마트에서 [${name}] 구매함! 🛒✨`);
+  navigator.clipboard.writeText(`[JARKET 플렉스] 나 슬롯 카지노 머니로 자켓마트에서 [${name}] 구매함! 🛒✨ https://jarket.onrender.com`);
   toast(`🎉 [${name}] 자랑 문구가 클립보드에 복사되었습니다! 친구들에게 공유하세요.`);
 }
+
+// ---------- 유저 판매 물품 등록 / 관리 ----------
+async function reloadProducts() {
+  try {
+    products = await (await fetch('/api/products')).json();
+    renderProducts();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function openSellModal() {
+  if (!token) {
+    openLoginModal();
+    return;
+  }
+  $('sellBackdrop').classList.add('show');
+}
+
+function closeSellModal() {
+  $('sellBackdrop').classList.remove('show');
+}
+
+async function handleSellSubmit() {
+  const name = $('sellName').value.trim();
+  const category = $('sellCat').value;
+  const icon = $('sellIcon').value.trim() || '📦';
+  const price = Number($('sellPrice').value);
+  const stock = Number($('sellStock').value);
+  const badge = $('sellBadge').value.trim() || '개인판매';
+  const descText = $('sellDesc').value.trim();
+
+  if (!name) {
+    alert('상품명을 입력해주세요.');
+    return;
+  }
+  if (!price || price < 10) {
+    alert('판매 가격은 10칩 이상으로 입력해주세요.');
+    return;
+  }
+  if (!stock || stock < 1) {
+    alert('수량은 1개 이상이어야 합니다.');
+    return;
+  }
+
+  $('submitSellBtn').disabled = true;
+  $('submitSellBtn').textContent = '매대에 진열하는 중...';
+
+  try {
+    const res = await api('/api/market/items', {
+      method: 'POST',
+      body: { name, category, icon, price, stock, badge, descText }
+    });
+
+    sfx.cash();
+    toast(`🎉 [${res.item.name}] 판매 물품이 자켓마트 매대에 등록되었습니다!`);
+    closeSellModal();
+    $('sellName').value = '';
+    $('sellPrice').value = '';
+    $('sellDesc').value = '';
+    $('sellStock').value = '1';
+
+    await reloadProducts();
+    await loadMyState();
+  } catch (err) {
+    alert(err.message || '물품 등록 실패');
+  } finally {
+    $('submitSellBtn').disabled = false;
+    $('submitSellBtn').textContent = '🚀 자켓마트 매대에 판매 등록하기';
+  }
+}
+
+async function openMySalesModal() {
+  if (!token) {
+    openLoginModal();
+    return;
+  }
+
+  const backdrop = $('mySalesBackdrop');
+  const listEl = $('mySalesList');
+  listEl.innerHTML = '<div style="text-align:center;padding:30px;">판매 내역을 불러오는 중...</div>';
+  backdrop.classList.add('show');
+
+  try {
+    const data = await api('/api/market/my');
+    $('totalEarnedVal').textContent = won(data.totalEarned || 0);
+
+    if (!data.items || !data.items.length) {
+      listEl.innerHTML = `
+        <div style="text-align:center;padding:40px;color:#64748b;">
+          <div style="font-size:3rem;margin-bottom:10px;">🏪</div>
+          <p>아직 등록한 판매 물품이 없습니다.</p>
+          <small>상단 '물품 판매 등록' 버튼을 눌러 나만의 물건을 팔아보세요!</small>
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = data.items.map(it => `
+      <div class="inv-item-card">
+        <div class="inv-item-left">
+          <span class="inv-icon">${it.icon}</span>
+          <div>
+            <div class="inv-title">${it.name} ${it.is_active ? '<span style="color:#10B981;font-size:0.75rem;">[판매중]</span>' : '<span style="color:#94A3B8;font-size:0.75rem;">[판매종료]</span>'}</div>
+            <div class="inv-meta">가격: ${won(it.price)} · 재고: <b>${it.stock}개</b> · 판매량: <b>${it.sales_count}개</b> (수익 ${won(it.price * it.sales_count)})</div>
+          </div>
+        </div>
+        <div>
+          ${it.is_active ? `<button class="btn-card" style="padding:6px 10px;font-size:0.75rem;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;" onclick="cancelSale(${it.id})">판매 취소</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="color:red;padding:20px;">내역 로드 실패: ${err.message}</div>`;
+  }
+}
+
+window.cancelSale = async function(itemId) {
+  if (!confirm('이 물품의 판매를 취소하고 매대에서 내릴까요?')) return;
+  try {
+    await api(`/api/market/items/${itemId}/cancel`, { method: 'POST' });
+    toast('물품 판매가 취소되었습니다.');
+    await openMySalesModal();
+    await reloadProducts();
+    await loadMyState();
+  } catch (err) {
+    alert(err.message || '취소 실패');
+  }
+};
 
 // ---------- ONEID 로그인 (PKCE) & 게스트 로그인 ----------
 const PKCE_KEY = 'jk_pkce';
@@ -551,6 +701,17 @@ function setupEvents() {
   $('closeInvBtn').onclick = () => $('invBackdrop').classList.remove('show');
   $('invBackdrop').onclick = e => { if (e.target === $('invBackdrop')) $('invBackdrop').classList.remove('show'); };
 
+  // 판매 등록 모달 열기/닫기/제출
+  $('openSellModalBtn').onclick = openSellModal;
+  $('closeSellBtn').onclick = closeSellModal;
+  $('sellBackdrop').onclick = e => { if (e.target === $('sellBackdrop')) closeSellModal(); };
+  $('submitSellBtn').onclick = handleSellSubmit;
+
+  // 내 판매 관리 모달 열기/닫기
+  $('openMySalesBtn').onclick = openMySalesModal;
+  $('closeMySalesBtn').onclick = () => $('mySalesBackdrop').classList.remove('show');
+  $('mySalesBackdrop').onclick = e => { if (e.target === $('mySalesBackdrop')) $('mySalesBackdrop').classList.remove('show'); };
+
   // 결제
   $('checkoutBtn').onclick = handleCheckout;
 
@@ -630,7 +791,6 @@ function setupEvents() {
   // 저장된 토큰 로드 (혹은 neonstrip 로그인 토큰 공유 확인)
   token = localStorage.getItem(AUTH_KEY);
   if (!token) {
-    // 혹시 같은 도메인에서 vegas-slots 로그인 토큰이 있는지 확인
     const slotAuth = JSON.parse(localStorage.getItem('ns_auth') || 'null');
     if (slotAuth && slotAuth.token) {
       token = slotAuth.token;
@@ -646,7 +806,7 @@ function setupEvents() {
 
   await loadMyState();
 
-  // 주기적 잔고 갱신 (슬롯 돌리면서 번 돈 자동 반영)
+  // 주기적 잔고 갱신 (슬롯 돌리면서 번 돈 & 판매 수익금 자동 반영)
   setInterval(() => {
     if (token && !document.hidden) loadMyState();
   }, 10_000);

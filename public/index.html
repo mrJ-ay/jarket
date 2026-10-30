@@ -54,6 +54,18 @@
           <div class="balance-val" id="myBalanceDisplay">₩0</div>
         </div>
 
+        <!-- 판매 등록 & 판매 관리 -->
+        <button class="header-pill-btn sell-btn" id="openSellModalBtn">
+          <span class="icon">➕</span>
+          <span>물품 판매 등록</span>
+        </button>
+
+        <button class="header-pill-btn" id="openMySalesBtn">
+          <span class="icon">💼</span>
+          <span>내 판매 관리</span>
+          <span class="counter-badge" id="myListingBadge" style="background:#10B981">0</span>
+        </button>
+
         <!-- 인벤토리 & 장바구니 버튼 -->
         <button class="header-pill-btn" id="openInventoryBtn">
           <span class="icon">🧊</span>
@@ -391,6 +403,107 @@
       </div>
       <div class="login-footer">
         <button class="ghost-btn" id="closeLoginBtn">창 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 물품 판매 등록 모달 -->
+  <div class="modal-backdrop" id="sellBackdrop">
+    <div class="inv-modal" style="width: 520px;">
+      <div class="inv-header">
+        <div class="inv-title-wrap">
+          <h3>🏪 자켓 당근장터 — 물품 판매 등록</h3>
+          <p>판매 대금은 다른 유저가 구매할 때 본인의 <b>카지노 잔고</b>로 즉시 입금됩니다!</p>
+        </div>
+        <button class="close-btn" id="closeSellBtn">✕</button>
+      </div>
+      <form id="sellForm" class="sell-form" onsubmit="return false;">
+        <div class="form-group">
+          <label>상품명 <span style="color:red">*</span></label>
+          <input type="text" id="sellName" placeholder="예: 잭팟 기원 부적, 먹다 남은 치킨, 중고 카트" maxlength="30" required>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>카테고리</label>
+            <select id="sellCat">
+              <option value="user">🥕 당근 장터 (유저 판매)</option>
+              <option value="fresh">🥩 신선 · 정육 · 수산</option>
+              <option value="deli">🍕 델리 · 즉석조리</option>
+              <option value="nobrand">🟡 No Money</option>
+              <option value="electro">⚡ 자켓트로 가전</option>
+              <option value="flex">💎 VVIP 플렉스</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>대표 이모지 아이콘</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="text" id="sellIcon" value="📦" maxlength="4" style="width:50px;text-align:center;font-size:1.4rem;">
+              <div class="quick-emojis">
+                <span class="emoji-pick" onclick="$('sellIcon').value='🍗'">🍗</span>
+                <span class="emoji-pick" onclick="$('sellIcon').value='🍕'">🍕</span>
+                <span class="emoji-pick" onclick="$('sellIcon').value='🥩'">🥩</span>
+                <span class="emoji-pick" onclick="$('sellIcon').value='💎'">💎</span>
+                <span class="emoji-pick" onclick="$('sellIcon').value='🎰'">🎰</span>
+                <span class="emoji-pick" onclick="$('sellIcon').value='🧸'">🧸</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>판매 가격 (₩ / 칩) <span style="color:red">*</span></label>
+            <input type="number" id="sellPrice" placeholder="예: 50000" min="10" step="10" required>
+          </div>
+          <div class="form-group">
+            <label>판매 수량 <span style="color:red">*</span></label>
+            <input type="number" id="sellStock" value="1" min="1" max="999" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>마트 스티커 배지 문구</label>
+          <input type="text" id="sellBadge" placeholder="예: 개인급처, 올인방지, 꿀매물, 1+1" maxlength="10">
+        </div>
+
+        <div class="form-group">
+          <label>상품 상세 설명</label>
+          <textarea id="sellDesc" rows="3" placeholder="구매욕을 자극하는 재미있는 설명을 적어보세요!" maxlength="200"></textarea>
+        </div>
+
+        <div class="revenue-notice">
+          💡 <b>수익 정산 안내</b>: 판매가 완료되는 즉시 NEON STRIP 슬롯게임의 카지노 칩으로 100% 입금됩니다!
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitSellBtn" style="width:100%;padding:12px;font-size:1rem;margin-top:10px;">
+          🚀 자켓마트 매대에 판매 등록하기
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 7. 내 판매 관리 모달 -->
+  <div class="modal-backdrop" id="mySalesBackdrop">
+    <div class="inv-modal" style="width: 540px;">
+      <div class="inv-header">
+        <div class="inv-title-wrap">
+          <h3>💼 내 판매 물품 관리 & 정산</h3>
+          <p>내가 등록한 매물 상태와 누적 카지노 수익금 현황입니다.</p>
+        </div>
+        <button class="close-btn" id="closeMySalesBtn">✕</button>
+      </div>
+
+      <div class="my-sales-summary-box">
+        <div>
+          <span>누적 정산된 카지노 수익금</span>
+          <b class="earnings-val" id="totalEarnedVal">₩0</b>
+        </div>
+        <span class="chip-badge">🎰 카지노 즉시 입금됨</span>
+      </div>
+
+      <div class="inv-body" id="mySalesList">
+        <!-- 내가 등록한 물품 목록 -->
       </div>
     </div>
   </div>
