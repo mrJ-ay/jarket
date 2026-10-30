@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARKET (자켓마트) — 슬롯 머니 전용 하이퍼마켓</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- 최상단 마트 안내 바 -->
+  <aside class="top-announcement" aria-label="마트 공지사항">
+    <div class="announcement-content">
+      <span class="badge-live">LIVE 안내방송</span>
+      <span id="announcementText" class="ticker-text">📢 [자켓마트 본점] 멸종 매머드 티본 스테이크 3만 년 숙성 완료! 슬롯 잭팟 터진 고객님 우대 매장!</span>
+    </div>
+    <div class="top-links">
+      <a href="http://localhost:5504" target="_blank" class="slot-quicklink">🎰 슬롯머신 바로가기</a>
+      <button id="bgmToggleBtn" class="bgm-btn" title="마트 CM송 효과음 토글">🔊 마트 징글</button>
+    </div>
+  </aside>
+
+  <!-- 메인 헤더 -->
+  <header class="main-header">
+    <div class="header-inner">
+      <div class="brand-wrap" id="brandLogo">
+        <div class="jarket-logo">
+          <div class="logo-circle">
+            <span class="logo-j">J</span>
+          </div>
+          <div class="logo-text-group">
+            <h1 class="logo-title">JARKET</h1>
+            <span class="logo-slogan">Everyday Low Profit, 자켓마트</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="search-bar-wrap">
+        <input type="text" id="searchInput" placeholder="어떤 탕진을 원하시나요? (매머드, 화장지, 슬롯머신 등)" autocomplete="off">
+        <button id="searchBtn" class="search-btn" aria-label="검색">🔍</button>
+      </div>
+
+      <div class="user-action-group">
+        <!-- 슬롯 잔고 위젯 -->
+        <div class="balance-card" id="balanceCard">
+          <div class="balance-label">
+            <span>슬롯 카지노 머니</span>
+            <span class="sync-dot" title="실시간 연동 중"></span>
+          </div>
+          <div class="balance-val" id="myBalanceDisplay">₩0</div>
+        </div>
+
+        <!-- 인벤토리 & 장바구니 버튼 -->
+        <button class="header-pill-btn" id="openInventoryBtn">
+          <span class="icon">🧊</span>
+          <span>내 냉장고</span>
+          <span class="counter-badge" id="invCountBadge">0</span>
+        </button>
+
+        <button class="header-pill-btn cart-btn" id="openCartBtn">
+          <span class="icon">🛒</span>
+          <span>장바구니</span>
+          <span class="counter-badge active" id="cartCountBadge">0</span>
+        </button>
+
+        <!-- 유저 계정 버튼 -->
+        <div class="account-menu" id="accountMenu">
+          <button class="account-btn" id="accountBtn">
+            <span id="userAva">👤</span>
+            <span id="userNameDisplay">로그인</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 전단지 특가 히어로 배너 (Flyer Banner) -->
+  <section class="flyer-hero">
+    <div class="flyer-card">
+      <div class="flyer-tag">🚨 금주의 파격 전단 특가 🚨</div>
+      <div class="flyer-body">
+        <div class="flyer-headline">
+          <h2>"슬롯 잭팟의 기쁨을 오늘 장바구니에 담으세요!"</h2>
+          <p>시베리아 3만 년산 매머드 티본부터 24K 순금 카트까지 — 카지노 칩 100% 결제 가능</p>
+        </div>
+        <div class="flyer-quick-items">
+          <div class="quick-item" data-id="mammoth_tbone">
+            <span class="q-icon">🍖</span>
+            <div class="q-info">
+              <b>빙하기 매머드 스테이크</b>
+              <span class="q-price">₩850,000,000</span>
+            </div>
+            <span class="q-badge">해동 7일</span>
+          </div>
+          <div class="quick-item" data-id="nm_tissue">
+            <span class="q-icon">🧻</span>
+            <div class="q-info">
+              <b>No Money 3겹 눈물휴지</b>
+              <span class="q-price">₩49,000</span>
+            </div>
+            <span class="q-badge">올인전용</span>
+          </div>
+          <div class="quick-item" data-id="real_slot_machine">
+            <span class="q-icon">🎰</span>
+            <div class="q-info">
+              <b>실물 슬롯머신 1대</b>
+              <span class="q-price">₩150,000,000</span>
+            </div>
+            <span class="q-badge">거실설치</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 메인 레이아웃 -->
+  <main class="content-container">
+    <!-- 카테고리 탭 바 -->
+    <nav class="category-tabs" id="categoryTabs">
+      <!-- JS로 동적 생성 -->
+    </nav>
+
+    <!-- 매장 상태 툴바 -->
+    <div class="store-toolbar">
+      <div class="left">
+        <h2 class="section-title" id="currentCategoryTitle">전체 상품 (ALL)</h2>
+        <span class="item-count-text" id="totalProductCount">15개 상품 진열 중</span>
+      </div>
+      <div class="right">
+        <label for="sortSelect" class="sr-only">정렬 기준</label>
+        <select id="sortSelect" class="sort-select">
+          <option value="featured">자켓 MD 추천순</option>
+          <option value="price-asc">낮은 가격순 (소박한 장바구니)</option>
+          <option value="price-desc">높은 가격순 (잭팟 플렉스)</option>
+          <option value="reviews">리뷰 많은 순</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 상품 그리드 -->
+    <div class="product-grid" id="productGrid">
+      <!-- JS로 동적 렌더링 -->
+    </div>
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="main-footer">
+    <div class="footer-inner">
+      <div class="f-brand">
+        <span class="f-logo">JARKET 자켓마트</span>
+        <p>대한민국 No.1 슬롯머신 가상 자금 전문 하이퍼마켓</p>
+        <small>© 2026 JARKET Corp. All Virtual Rights Reserved. (실제 현금 결제 및 실물 배송이 없는 가상 게임 패러디 사이트입니다.)</small>
+      </div>
+      <div class="f-links">
+        <div>
+          <h4>패밀리 서비스</h4>
+          <ul>
+            <li><a href="http://localhost:5504" target="_blank">🎰 NEON STRIP 슬롯게임</a></li>
+            <li><a href="http://localhost:8000" target="_blank">🔑 ONEID 통합 계정</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>고객센터 안내</h4>
+          <p>자켓마트 고객센터: 777-7777 (연중무휴)</p>
+          <p>환불 요청 시: "슬롯머신에서 돈을 다시 따오시면 됩니다."</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== 모달 & 드로어 ==================== -->
+
+  <!-- 1. 장바구니 드로어 -->
+  <div class="cart-backdrop" id="cartBackdrop"></div>
+  <aside class="cart-drawer" id="cartDrawer" aria-label="장바구니">
+    <div class="cart-header">
+      <div class="title-wrap">
+        <h2>🛒 내 쇼핑 카트</h2>
+        <span class="sub" id="cartItemTotalCount">0개 상품</span>
+      </div>
+      <button class="close-btn" id="closeCartBtn">✕</button>
+    </div>
+
+    <div class="cart-body" id="cartItemList">
+      <!-- 장바구니 비었을 때 / 목록 -->
+    </div>
+
+    <div class="cart-footer">
+      <div class="cart-summary-row">
+        <span>상품 총 금액</span>
+        <b id="cartSubtotal">₩0</b>
+      </div>
+      <div class="cart-summary-row">
+        <span>배송비</span>
+        <span class="free-badge">무료배송 (초광속 카트 직송)</span>
+      </div>
+      <div class="cart-total-row">
+        <span>최종 결제 금액</span>
+        <b class="total-price" id="cartFinalTotal">₩0</b>
+      </div>
+
+      <button class="checkout-btn" id="checkoutBtn">
+        <span class="btn-text">🎰 슬롯 머니로 전액 결제하기</span>
+      </button>
+      <div class="checkout-tip">※ 결제 시 NEON STRIP 슬롯 머신의 칩 잔고가 실시간 차감됩니다.</div>
+    </div>
+  </aside>
+
+  <!-- 2. 영수증 모달 (감열지 마트 영수증 스타일) -->
+  <div class="modal-backdrop" id="receiptBackdrop">
+    <div class="receipt-container" id="receiptContainer">
+      <div class="receipt-paper">
+        <div class="receipt-sawtooth-top"></div>
+        <div class="receipt-content">
+          <div class="receipt-header">
+            <h3>[ 자 켓 마 트 ]</h3>
+            <h4>JARKET HYPERMARKET</h4>
+            <p>본점 (서울시 잭팟구 럭키로 777)</p>
+            <p>대표자: 이슬롯 | 사업자: 777-88-99999</p>
+            <p>매장전화: 02-777-1234</p>
+            <div class="dotted-line"></div>
+          </div>
+
+          <div class="receipt-info-row">
+            <span>영수증 번호:</span>
+            <b id="recNo">JK-20261030-001</b>
+          </div>
+          <div class="receipt-info-row">
+            <span>구매 일시:</span>
+            <span id="recDate">2026-10-30 19:35</span>
+          </div>
+          <div class="receipt-info-row">
+            <span>주문 고객:</span>
+            <span id="recCustomer">자켓단골손님</span>
+          </div>
+          <div class="dotted-line"></div>
+
+          <table class="receipt-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">상품명</th>
+                <th style="text-align: center;">수량</th>
+                <th style="text-align: right;">단가</th>
+                <th style="text-align: right;">금액</th>
+              </tr>
+            </thead>
+            <tbody id="recTableBody">
+              <!-- 품목 목록 -->
+            </tbody>
+          </table>
+
+          <div class="dotted-line"></div>
+          <div class="receipt-total-group">
+            <div class="rec-row">
+              <span>과세 물품 가액</span>
+              <span id="recNet">₩0</span>
+            </div>
+            <div class="rec-row">
+              <span>부 가 세 (10%)</span>
+              <span id="recVat">₩0</span>
+            </div>
+            <div class="rec-row total">
+              <span>합 계 금 액</span>
+              <b id="recTotal">₩0</b>
+            </div>
+            <div class="rec-row">
+              <span>결 제 수 단</span>
+              <span>NEON STRIP 가상 칩</span>
+            </div>
+            <div class="rec-row">
+              <span>결제 후 잔여 잔고</span>
+              <b id="recBalAfter" style="color: #0b69a3;">₩0</b>
+            </div>
+          </div>
+          <div class="dotted-line"></div>
+
+          <div class="barcode-wrap">
+            <div class="barcode-stripes"></div>
+            <span class="barcode-text" id="recBarcode">||| | ||||| |||| || |||||| | |||</span>
+          </div>
+
+          <div class="receipt-notice">
+            <p>※ 본 영수증은 100% 가상 게임 연출입니다.</p>
+            <p>※ 환불/교환 불가: 물품은 이미 전용 초광속 카트로 발송되었습니다.</p>
+            <p>감사합니다. 매일매일 적자! JARKET</p>
+          </div>
+        </div>
+        <div class="receipt-sawtooth-bottom"></div>
+      </div>
+
+      <div class="receipt-actions">
+        <button class="rec-btn track" id="trackDeliveryBtn">🚀 실시간 배송 추적</button>
+        <button class="rec-btn close" id="closeReceiptBtn">영수증 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 실시간 배송 추적 모달 -->
+  <div class="modal-backdrop" id="trackerBackdrop">
+    <div class="tracker-modal">
+      <div class="tracker-header">
+        <h3>🚀 JARKET 초광속 로켓 카트 배송 조회</h3>
+        <button class="close-btn" id="closeTrackerBtn">✕</button>
+      </div>
+      <div class="tracker-body">
+        <div class="cart-anim-track">
+          <div class="cart-moving-icon" id="cartMovingIcon">🛒💨</div>
+        </div>
+        <div class="tracker-steps">
+          <div class="step active" id="step1">
+            <div class="step-num">1</div>
+            <div class="step-text">
+              <b>카트 패킹 완료</b>
+              <small>매장 직원이 카트 끌고 질주</small>
+            </div>
+          </div>
+          <div class="step" id="step2">
+            <div class="step-num">2</div>
+            <div class="step-text">
+              <b>고속도로 주행</b>
+              <small>시속 120km로 카트 질주 중</small>
+            </div>
+          </div>
+          <div class="step" id="step3">
+            <div class="step-num">3</div>
+            <div class="step-text">
+              <b>배송 완료</b>
+              <small>현관 앞에 두고 벨튀 성공! 🔔</small>
+            </div>
+          </div>
+        </div>
+        <div class="delivery-status-box" id="deliveryStatusBox">
+          📦 배송 기사님이 24K 순금 카트를 타고 고객님 댁으로 광속 이동하고 있습니다!
+        </div>
+      </div>
+      <div class="tracker-footer">
+        <button class="btn-primary" id="trackerOkBtn">확인 (내 냉장고로 가기)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 내 냉장고 & 보관함 (인벤토리) 모달 -->
+  <div class="modal-backdrop" id="invBackdrop">
+    <div class="inv-modal">
+      <div class="inv-header">
+        <div class="inv-title-wrap">
+          <h3>🧊 내 자켓 보관함 & 냉장고</h3>
+          <p>슬롯 잭팟으로 구매한 내 보물 창고입니다.</p>
+        </div>
+        <button class="close-btn" id="closeInvBtn">✕</button>
+      </div>
+      <div class="inv-body" id="invList">
+        <!-- 인벤토리 아이템 목록 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 로그인 선택 모달 (ONEID or 게스트 체험) -->
+  <div class="modal-backdrop" id="loginBackdrop">
+    <div class="login-modal">
+      <div class="login-header">
+        <div class="login-logo-circle">J</div>
+        <h3>자켓마트 회원 인증</h3>
+        <p>슬롯 게임 머니와 실시간 연동을 시작하세요</p>
+      </div>
+      <div class="login-body">
+        <button class="login-choice-btn oneid" id="oneidLoginBtn">
+          <span class="icon">🔑</span>
+          <div class="text">
+            <b>ONEID 통합 계정으로 로그인</b>
+            <small>NEON STRIP 슬롯 카지노 머니와 실시간 연동</small>
+          </div>
+        </button>
+
+        <div class="or-divider"><span>또는 간편 체험</span></div>
+
+        <div class="guest-box">
+          <input type="text" id="guestNameInput" placeholder="손님 닉네임 입력 (예: 잭팟황제)" maxlength="12">
+          <button class="login-choice-btn guest" id="guestLoginBtn">
+            <span class="icon">⚡</span>
+            <div class="text">
+              <b>체험용 게스트로 입장 (1천만 칩 증정)</b>
+              <small>서버 연동 없이 바로 쇼핑 시작</small>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div class="login-footer">
+        <button class="ghost-btn" id="closeLoginBtn">창 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 컨테이너 -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
