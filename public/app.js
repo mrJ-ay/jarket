@@ -608,6 +608,12 @@ function setupEvents() {
   try {
     CFG = await (await fetch('/api/config')).json();
     products = await (await fetch('/api/products')).json();
+    if (CFG && CFG.slotsUrl) {
+      document.querySelectorAll('.slot-quicklink').forEach(el => el.href = CFG.slotsUrl);
+    }
+    if (CFG && CFG.oneidUrl && $('oneidFooterLink')) {
+      $('oneidFooterLink').href = CFG.oneidUrl;
+    }
   } catch (err) {
     console.error('Server connect error:', err);
     toast('마트 서버에 연결할 수 없습니다.');
