@@ -532,7 +532,7 @@ async function openInventoryModal() {
 
         <div class="inv-item-bottom">
           <button class="btn-card" style="padding:6px 10px;font-size:0.75rem;background:#FEF3C7;border:1px solid #F59E0B;" onclick="interactItem('${it.name}')">📢 자랑하기</button>
-          <button class="btn-use-skill" onclick="useItemSkill('${it.item_id || it.id}')">⚡ 스킬 사용하기</button>
+          <button class="btn-use-skill" onclick="useItemSkill('${it.item_id || it.id}', this)">⚡ 스킬 사용하기</button>
         </div>
       </div>
     `).join('');
@@ -541,13 +541,12 @@ async function openInventoryModal() {
   }
 }
 
-async function useItemSkill(itemId) {
+async function useItemSkill(itemId, btn) {
   if (!token) {
     openLoginModal();
     return;
   }
 
-  const btn = event?.currentTarget;
   if (btn) {
     btn.disabled = true;
     btn.textContent = '스킬 시전 중...';
