@@ -11,7 +11,7 @@ import express from 'express';
 
 import {
   initSchema, isDbAvailable, getPlayer, processCheckout,
-  getUserInventory, getUserOrders, getReceipt,
+  getUserInventory, getUserOrders, getReceipt, useInventoryItem,
   createMarketItem, getActiveMarketItems, getSellerMarketItems, cancelMarketItem,
   getAdminStats, getAdminOrders, refundOrderAdmin,
   getAdminMarketItems, deleteMarketItemAdmin, getAdminPlayers, giftPlayerChips
@@ -194,6 +194,32 @@ app.get('/api/me', requireAuth, async (req, res) => {
 app.get('/api/inventory', requireAuth, async (req, res) => {
   const items = await getUserInventory(req.user.id);
   res.json({ items });
+});
+
+// ---------- 아이템 고유 스킬 사용 ----------
+app.post('/api/inventory/use', requireAuth, async (req, res) => {
+  try {
+    const { itemId } = req.body || {};
+    if (!itemId) {
+      return res.status(400).json({ error: '사용할 아이템 ID가 필요합니다.' });
+    }
+
+    const result = await useInventoryItem({
+      uid: req.user.id,
+      userName: req.user.name,
+      itemId
+    });
+
+    // 스킬 사용 방송 (고가 아이템이거나 broadcast true일 때, 혹은 대박 당첨 시)
+    if (result.skill?.broadcast || result.reward >= 500) {
+      liveAnnouncement = `✨ [스킬 발동] ${req.user.name}님이 [${result.itemName}]의 [${result.skill.name}] 스킬을 발동하여 $${result.reward.toLocaleString()} 칩을 획득하셨습니다! 🎰`;
+    }
+
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[Use Skill Error]', err);
+    res.status(400).json({ error: err.message || '스킬 사용 실패' });
+  }
 });
 
 // ---------- 주문 내역 ----------

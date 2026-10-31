@@ -379,6 +379,26 @@
         <!-- 인벤토리 아이템 목록 -->
       </div>
     </div>
+  <!-- 4-1. 스킬 발동 축하 팝업 모달 -->
+  <div class="modal-backdrop" id="skillResultBackdrop">
+    <div class="skill-result-modal" id="skillResultModal">
+      <div class="skill-result-particles" id="skillParticles"></div>
+      <div class="skill-result-icon" id="skillResIcon">🥓</div>
+      <div class="skill-result-badge" id="skillResBadge">🥩 즉시 회복</div>
+      <h3 class="skill-result-title" id="skillResTitle">지글지글 육즙 힐링</h3>
+      <p class="skill-result-desc" id="skillResDesc">불판 위에서 지글지글 피로를 날렸습니다!</p>
+
+      <div class="skill-reward-box">
+        <span class="skill-reward-label">획득한 슬롯 머니</span>
+        <div class="skill-reward-amount" id="skillResAmount">+$25</div>
+      </div>
+
+      <div class="skill-bal-info">
+        현재 카지노 잔고: <strong id="skillResBalAfter">$1,025</strong>
+      </div>
+
+      <button class="btn-primary skill-ok-btn" id="closeSkillResultBtn">스킬 사용 완료 🎰</button>
+    </div>
   </div>
 
   <!-- 5. 로그인 선택 모달 (ONEID or 게스트 체험) -->

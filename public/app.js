@@ -64,6 +64,30 @@ const sfx = {
   jingle: () => {
     const notes = [523, 659, 784, 1047, 784, 1047];
     notes.forEach((f, i) => playTone(f, 0.16, 'square', 0.04, i * 0.13));
+  },
+  // 지글지글 고기 불판 소리
+  sizzle: () => {
+    [220, 246, 220, 261, 246, 293, 261, 329].forEach((f, i) => playTone(f + Math.random() * 80, 0.05, 'sawtooth', 0.03, i * 0.04));
+  },
+  // 물 꿀꺽/방울 소리
+  water: () => {
+    [440, 554, 659, 880].forEach((f, i) => playTone(f, 0.08, 'sine', 0.06, i * 0.06));
+  },
+  // 바삭/크런치 소리
+  crunch: () => {
+    [300, 450, 200, 350, 150].forEach((f, i) => playTone(f, 0.04, 'triangle', 0.05, i * 0.03));
+  },
+  // 레이저 / 게이밍 RGB 소리
+  laser: () => {
+    [880, 1174, 1479, 1760, 2349].forEach((f, i) => playTone(f, 0.06, 'sawtooth', 0.05, i * 0.05));
+  },
+  // 팡파레 축하
+  fanfare: () => {
+    [523, 659, 783, 1046, 1318, 1567].forEach((f, i) => playTone(f, 0.15, 'triangle', 0.07, i * 0.1));
+  },
+  // 잭팟 슬롯 대박 분출
+  jackpot: () => {
+    [523, 659, 783, 1046, 783, 1046, 1318, 1567, 2093].forEach((f, i) => playTone(f, 0.12, 'square', 0.05, i * 0.08));
   }
 };
 
@@ -255,6 +279,15 @@ function renderProducts() {
         <h3 class="card-title">${p.name}</h3>
         ${p.sellerName ? `<div class="seller-tag">🧑‍🌾 셀러: ${p.sellerName} (수익금 카지노 입금)</div>` : ''}
         <p class="card-desc" style="margin-top:6px;">${p.desc}</p>
+        ${p.skill ? `
+          <div class="card-skill-box">
+            <div class="card-skill-header">
+              <span class="card-skill-badge">${p.skill.badge || '스킬'}</span>
+              <strong class="card-skill-name">${p.skill.name}</strong>
+            </div>
+            <div class="card-skill-desc">${p.skill.desc}</div>
+          </div>
+        ` : ''}
         <div class="card-price-group">
           ${p.originalPrice ? `<div class="orig-price">${won(p.originalPrice)}</div>` : ''}
           <div class="current-price">${won(p.price)}</div>
@@ -475,22 +508,97 @@ async function openInventoryModal() {
     }
 
     listEl.innerHTML = data.items.map(it => `
-      <div class="inv-item-card">
-        <div class="inv-item-left">
-          <span class="inv-icon">${it.icon}</span>
-          <div>
-            <div class="inv-title">${it.name}</div>
-            <div class="inv-meta">구매단가: ${won(it.unit_price)} · 최근 구매: ${new Date(it.last_bought_at).toLocaleDateString()}</div>
+      <div class="inv-item-card" id="inv_card_${it.item_id || it.id}">
+        <div class="inv-item-top">
+          <div class="inv-item-left">
+            <span class="inv-icon">${it.icon}</span>
+            <div>
+              <div class="inv-title">${it.name}</div>
+              <div class="inv-meta">구매단가: ${won(it.unit_price)} · 최근 구매: ${new Date(it.last_bought_at).toLocaleDateString()}</div>
+            </div>
           </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
           <span class="inv-badge-qty">${it.quantity}개 보유</span>
-          <button class="btn-card" style="padding:6px 10px;font-size:0.75rem;background:#FEF3C7;border:1px solid #F59E0B;" onclick="interactItem('${it.name}')">자랑하기</button>
+        </div>
+
+        ${it.skill ? `
+          <div class="inv-item-skill">
+            <div class="inv-item-skill-left">
+              <span class="inv-skill-badge">${it.skill.badge || '스킬'}</span>
+              <strong style="color:#92400E;">${it.skill.name}</strong>
+            </div>
+            <div class="inv-skill-desc">${it.skill.desc}</div>
+          </div>
+        ` : ''}
+
+        <div class="inv-item-bottom">
+          <button class="btn-card" style="padding:6px 10px;font-size:0.75rem;background:#FEF3C7;border:1px solid #F59E0B;" onclick="interactItem('${it.name}')">📢 자랑하기</button>
+          <button class="btn-use-skill" onclick="useItemSkill('${it.item_id || it.id}')">⚡ 스킬 사용하기</button>
         </div>
       </div>
     `).join('');
   } catch (err) {
     listEl.innerHTML = `<div style="color:red;padding:20px;">인벤토리 로드 실패: ${err.message}</div>`;
+  }
+}
+
+async function useItemSkill(itemId) {
+  if (!token) {
+    openLoginModal();
+    return;
+  }
+
+  const btn = event?.currentTarget;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '스킬 시전 중...';
+  }
+
+  try {
+    const res = await api('/api/inventory/use', {
+      method: 'POST',
+      body: { itemId }
+    });
+
+    // 사운드 재생
+    const soundType = res.skill?.sound || 'cash';
+    if (typeof sfx[soundType] === 'function') {
+      sfx[soundType]();
+    } else {
+      sfx.cash();
+    }
+
+    // 잔고 업데이트
+    balance = res.balanceAfter;
+    if ($('myBalanceDisplay')) $('myBalanceDisplay').textContent = won(balance);
+
+    // 모달 닫기 버튼 설정
+    $('closeSkillResultBtn').onclick = () => {
+      $('skillResultBackdrop').classList.remove('show');
+    };
+
+    // 결과 팝업 채우기
+    $('skillResIcon').textContent = res.icon || '✨';
+    $('skillResBadge').textContent = res.skill?.badge || '스킬 발동';
+    $('skillResTitle').textContent = res.skill?.name || '스킬 발동!';
+    $('skillResDesc').textContent = res.skill?.desc || `${res.itemName} 스킬이 성공적으로 발동되었습니다!`;
+    $('skillResAmount').textContent = `+${won(res.reward)}`;
+    $('skillResBalAfter').textContent = won(res.balanceAfter);
+
+    $('skillResultBackdrop').classList.add('show');
+
+    // 토스트 및 알림
+    toast(`⚡ [${res.itemName}] 스킬 발동! +${won(res.reward)} 획득!`);
+
+    // 인벤토리 다시 갱신
+    await openInventoryModal();
+    loadMyState();
+  } catch (err) {
+    alert(err.message || '스킬 사용에 실패했습니다.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '⚡ 스킬 사용하기';
+    }
   }
 }
 
@@ -751,6 +859,16 @@ function setupEvents() {
     $('trackerBackdrop').classList.remove('show');
     openInventoryModal();
   };
+
+  // 스킬 결과 축하 모달 닫기
+  if ($('closeSkillResultBtn')) {
+    $('closeSkillResultBtn').onclick = () => $('skillResultBackdrop').classList.remove('show');
+  }
+  if ($('skillResultBackdrop')) {
+    $('skillResultBackdrop').onclick = e => {
+      if (e.target === $('skillResultBackdrop')) $('skillResultBackdrop').classList.remove('show');
+    };
+  }
 
   // 로그인 및 로그아웃 버튼
   $('accountBtn').onclick = openLoginModal;
