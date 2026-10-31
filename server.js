@@ -11,7 +11,7 @@ import express from 'express';
 
 import {
   initSchema, isDbAvailable, getPlayer, processCheckout,
-  getUserInventory, getUserOrders, getReceipt, useInventoryItem,
+  getUserInventory, getUserOrders, getReceipt, useInventoryItem, useAllInventoryItems,
   createMarketItem, getActiveMarketItems, getSellerMarketItems, cancelMarketItem,
   getAdminStats, getAdminOrders, refundOrderAdmin,
   getAdminMarketItems, deleteMarketItemAdmin, getAdminPlayers, giftPlayerChips
@@ -219,6 +219,25 @@ app.post('/api/inventory/use', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[Use Skill Error]', err);
     res.status(400).json({ error: err.message || '스킬 사용 실패' });
+  }
+});
+
+// ---------- 보유한 모든 스킬 전체 동시 발동 ----------
+app.post('/api/inventory/use-all', requireAuth, async (req, res) => {
+  try {
+    const result = await useAllInventoryItems({
+      uid: req.user.id,
+      userName: req.user.name
+    });
+
+    if (result.totalReward >= 100) {
+      liveAnnouncement = `⚡ [메가 콤보 발동] ${req.user.name}님이 ${result.comboCount}개 스킬을 동시 발동하여 총 $${result.totalReward.toLocaleString()} 칩을 대량 획득하셨습니다! 🎰🔥`;
+    }
+
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[Use All Skills Error]', err);
+    res.status(400).json({ error: err.message || '전체 스킬 동시 발동 실패' });
   }
 });
 

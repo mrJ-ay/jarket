@@ -532,7 +532,7 @@ async function openInventoryModal() {
 
         <div class="inv-item-bottom">
           <button class="btn-card" style="padding:6px 10px;font-size:0.75rem;background:#FEF3C7;border:1px solid #F59E0B;" onclick="interactItem('${it.name}')">📢 자랑하기</button>
-          <a class="btn-use-skill slot-quicklink" href="${CFG?.slotsUrl || 'https://vegas-slots-2izy.onrender.com'}" target="_blank" style="text-decoration:none;">🎰 슬롯에서 버프 적용하기 ↗</a>
+          <button class="btn-use-skill" onclick="useItemSkill('${it.item_id || it.id}', this)">⚡ 스킬 단독 사용</button>
         </div>
       </div>
     `).join('');
@@ -596,10 +596,69 @@ async function useItemSkill(itemId, btn) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '⚡ 스킬 사용하기';
+      btn.textContent = '⚡ 스킬 단독 사용';
     }
   }
 }
+
+/** 보유한 모든 인벤토리 스킬 전체 동시 발동! */
+async function useAllSkills() {
+  if (!token) {
+    openLoginModal();
+    return;
+  }
+
+  const btn = $('useAllSkillsBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⚡ 전체 동시 시전 중...';
+  }
+
+  try {
+    const res = await api('/api/inventory/use-all', { method: 'POST' });
+
+    // 사운드 재생
+    if (typeof sfx.jackpot === 'function') sfx.jackpot();
+    if (typeof sfx.cash === 'function') sfx.cash();
+
+    // 잔고 업데이트
+    balance = res.balanceAfter;
+    if ($('myBalanceDisplay')) $('myBalanceDisplay').textContent = won(balance);
+
+    // 모달 닫기 버튼 설정
+    $('closeSkillResultBtn').onclick = () => {
+      $('skillResultBackdrop').classList.remove('show');
+    };
+
+    // 결과 팝업 채우기
+    $('skillResIcon').textContent = '⚡🔥';
+    $('skillResBadge').textContent = `${res.comboCount}중 메가 콤보 발동!`;
+    $('skillResTitle').textContent = `전체 스킬 동시 발동 성공! (${res.comboCount}개 동시 폭발)`;
+    const skillsSummary = (res.triggeredSkills || []).map(s => `${s.icon} ${s.name} (+${won(s.reward)})`).join(' · ');
+    $('skillResDesc').textContent = `보유한 모든 아이템의 스킬이 동시에 폭발했습니다!\n${skillsSummary}`;
+    $('skillResAmount').textContent = `+${won(res.totalReward)}`;
+    $('skillResBalAfter').textContent = won(res.balanceAfter);
+
+    $('skillResultBackdrop').classList.add('show');
+
+    // 토스트 알림
+    toast(`⚡ [${res.comboCount}개 스킬 동시 발동] 총 +${won(res.totalReward)} 카지노 칩 획득!`);
+
+    // 인벤토리 다시 갱신
+    await openInventoryModal();
+    loadMyState();
+  } catch (err) {
+    alert(err.message || '전체 스킬 동시 발동에 실패했습니다.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '⚡ 보유 스킬 전체 동시 발동!';
+    }
+  }
+}
+
+window.useItemSkill = useItemSkill;
+window.useAllSkills = useAllSkills;
 
 function interactItem(name) {
   navigator.clipboard.writeText(`[JARKET 플렉스] 나 슬롯 카지노 머니로 자켓마트에서 [${name}] 구매함! 🛒✨ https://jarket.onrender.com`);
@@ -829,10 +888,11 @@ function setupEvents() {
   $('closeCartBtn').onclick = closeCart;
   $('cartBackdrop').onclick = closeCart;
 
-  // 인벤토리 열기/닫기
+  // 인벤토리 열기/닫기 & 스킬 전체 동시 발동
   $('openInventoryBtn').onclick = openInventoryModal;
   $('closeInvBtn').onclick = () => $('invBackdrop').classList.remove('show');
   $('invBackdrop').onclick = e => { if (e.target === $('invBackdrop')) $('invBackdrop').classList.remove('show'); };
+  if ($('useAllSkillsBtn')) $('useAllSkillsBtn').onclick = useAllSkills;
 
   // 판매 등록 모달 열기/닫기/제출
   $('openSellModalBtn').onclick = openSellModal;
