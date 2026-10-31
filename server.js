@@ -11,7 +11,7 @@ import express from 'express';
 
 import {
   initSchema, isDbAvailable, getPlayer, processCheckout,
-  getUserInventory, getUserOrders, getReceipt, useInventoryItem, useAllInventoryItems,
+  getUserInventory, getUserOrders, getReceipt, useInventoryItem, useAllInventoryItems, toggleInventoryActive,
   createMarketItem, getActiveMarketItems, getSellerMarketItems, cancelMarketItem,
   getAdminStats, getAdminOrders, refundOrderAdmin,
   getAdminMarketItems, deleteMarketItemAdmin, getAdminPlayers, giftPlayerChips
@@ -238,6 +238,46 @@ app.post('/api/inventory/use-all', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[Use All Skills Error]', err);
     res.status(400).json({ error: err.message || '전체 스킬 동시 발동 실패' });
+  }
+});
+
+// ---------- 스킬 체크박스 ON/OFF 토글 & 수량 조절 ----------
+app.post('/api/inventory/toggle', requireAuth, async (req, res) => {
+  try {
+    const { itemId, isActive, activeQty } = req.body || {};
+    if (!itemId) return res.status(400).json({ error: 'itemId 필요' });
+
+    await toggleInventoryActive({
+      uid: req.user.id,
+      itemId,
+      isActive,
+      activeQty
+    });
+
+    const items = await getUserInventory(req.user.id);
+    res.json({ ok: true, items });
+  } catch (err) {
+    console.error('[Toggle Skill Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- 전체 스킬 일괄 켜기 / 끄기 ----------
+app.post('/api/inventory/toggle-all', requireAuth, async (req, res) => {
+  try {
+    const { isActive } = req.body || {};
+    const items = await getUserInventory(req.user.id);
+    for (const item of items) {
+      await toggleInventoryActive({
+        uid: req.user.id,
+        itemId: item.item_id || item.id,
+        isActive: isActive ?? true
+      });
+    }
+    const updated = await getUserInventory(req.user.id);
+    res.json({ ok: true, items: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

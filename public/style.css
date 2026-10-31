@@ -1792,6 +1792,8 @@ body {
 /* 인벤토리 상단 액션바 & 전체 스킬 동시 발동 버튼 */
 .inv-action-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
   padding: 12px 18px;
   background: #F8FAFC;
@@ -1799,46 +1801,39 @@ body {
   border-top: 1px solid #F1F5F9;
 }
 
-.btn-combo-all {
-  flex: 1.2;
-  background: linear-gradient(135deg, #EF4444 0%, #DC2626 50%, #B91C1C 100%);
-  color: #FFFFFF;
-  border: none;
-  font-weight: 800;
-  font-size: 0.88rem;
-  padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.inv-batch-actions {
+  display: flex;
   gap: 6px;
-  letter-spacing: -0.3px;
 }
-.btn-combo-all:hover {
-  background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.45);
+
+.btn-check-all, .btn-uncheck-all {
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
 }
-.btn-combo-all:active {
-  transform: translateY(1px);
+.btn-check-all:hover {
+  background: #ECFDF5;
+  border-color: #10B981;
+  color: #059669;
 }
-.btn-combo-all:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.btn-uncheck-all:hover {
+  background: #FEF2F2;
+  border-color: #EF4444;
+  color: #DC2626;
 }
 
 .btn-slot-all {
-  flex: 1;
   background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
   color: #FFFFFF !important;
   text-decoration: none;
   font-weight: 800;
   font-size: 0.82rem;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
@@ -1849,5 +1844,96 @@ body {
 .btn-slot-all:hover {
   background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
   transform: translateY(-1px);
+}
+
+/* 스킬 체크박스 및 동시 적용 수량 UI */
+.inv-skill-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.inv-skill-chk {
+  width: 18px;
+  height: 18px;
+  accent-color: #D97706;
+  cursor: pointer;
+}
+
+.inv-active-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.inv-active-pill.on {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+}
+.inv-active-pill.off {
+  background: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+}
+
+.inv-item-card.inactive {
+  opacity: 0.6;
+  background: #F8FAFC;
+}
+
+.inv-item-qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #FEF3C7;
+  border: 1px dashed #F59E0B;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+.qty-row-label {
+  font-weight: 800;
+  color: #92400E;
+  white-space: nowrap;
+}
+.qty-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+.qty-slider {
+  flex: 1;
+  max-width: 140px;
+  cursor: pointer;
+  accent-color: #D97706;
+}
+.qty-val-badge {
+  font-weight: 900;
+  color: #B45309;
+  font-family: var(--font-mono);
+  min-width: 32px;
+  text-align: right;
+}
+.btn-max-qty {
+  border: 1px solid #D97706;
+  background: #FFFFFF;
+  color: #B45309;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-max-qty:hover {
+  background: #D97706;
+  color: #FFFFFF;
 }
 
