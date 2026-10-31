@@ -532,7 +532,7 @@ async function openInventoryModal() {
 
         <div class="inv-item-bottom">
           <button class="btn-card" style="padding:6px 10px;font-size:0.75rem;background:#FEF3C7;border:1px solid #F59E0B;" onclick="interactItem('${it.name}')">📢 자랑하기</button>
-          <button class="btn-use-skill" onclick="useItemSkill('${it.item_id || it.id}', this)">⚡ 스킬 사용하기</button>
+          <a class="btn-use-skill slot-quicklink" href="${CFG?.slotsUrl || 'https://vegas-slots-2izy.onrender.com'}" target="_blank" style="text-decoration:none;">🎰 슬롯에서 버프 적용하기 ↗</a>
         </div>
       </div>
     `).join('');
